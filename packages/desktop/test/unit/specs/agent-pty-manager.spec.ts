@@ -2,7 +2,6 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { afterEach, describe, expect, it } from 'vitest'
-import { repoRegistry } from 'main_renderer/agent/repo/repoRegistry'
 import { PtyManager, PtyManagerError } from 'main_renderer/agent/terminal/ptyManager'
 
 const windowId = 33
@@ -11,7 +10,6 @@ const managers: PtyManager[] = []
 
 afterEach(async() => {
   for (const manager of managers.splice(0)) await manager.disposeWindow(windowId)
-  repoRegistry.release(windowId)
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
 })
 
@@ -29,12 +27,11 @@ const waitFor = async(ready: () => boolean, label: string): Promise<void> => {
   }
 }
 
-const open = (root: string): { manager: PtyManager, output: string[], exits: { termId: string, code: number | null }[] } => {
+const open = (): { manager: PtyManager, output: string[], exits: { termId: string, code: number | null }[] } => {
   const output: string[] = []
   const exits: { termId: string, code: number | null }[] = []
   const manager = new PtyManager({
     shellPreference: () => '',
-    repoRoot: (id) => id === windowId ? root : null,
     newId: () => 'term-1',
     onData: (_windowId, _termId, data) => {
       output.push(data)
@@ -48,22 +45,20 @@ const open = (root: string): { manager: PtyManager, output: string[], exits: { t
 }
 
 describe('ptyManager', () => {
-  it('rejects create when the window has no repository', () => {
+  it('rejects create when the window has no directory', () => {
     const manager = new PtyManager({
       shellPreference: () => '',
-      repoRoot: () => null,
       newId: () => 'term-1',
       onData: () => undefined,
       onExit: () => undefined
     })
-    expect(() => manager.create(windowId, { cols: 80, rows: 24 })).toThrow(PtyManagerError)
+    expect(() => manager.create(windowId, { cols: 80, rows: 24, cwd: '  ' })).toThrow(PtyManagerError)
   })
 
-  it('prints the repository root, accepts a resize, and exits when killed', async() => {
+  it('prints its working directory, accepts a resize, and exits when killed', async() => {
     const root = tempDir()
-    repoRegistry.claim(windowId, { kind: 'repo', root, userName: 'Ada' })
-    const { manager, output, exits } = open(root)
-    const created = manager.create(windowId, { cols: 80, rows: 24 })
+    const { manager, output, exits } = open()
+    const created = manager.create(windowId, { cols: 80, rows: 24, cwd: root })
     expect(created.termId).toBe('term-1')
     expect(created.shell.includes('/') || created.shell.includes('\\')).toBe(false)
 
@@ -74,7 +69,7 @@ describe('ptyManager', () => {
       return process.platform === 'win32'
         ? text.toLowerCase().includes(root.toLowerCase())
         : text.includes(root)
-    }, 'the shell did not print the repository root')
+    }, 'the shell did not print its working directory')
 
     expect(() => manager.resize(windowId, created.termId, 100, 40)).not.toThrow()
     manager.kill(windowId, created.termId)

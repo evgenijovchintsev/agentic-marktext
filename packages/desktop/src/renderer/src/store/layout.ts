@@ -9,7 +9,7 @@ import {
   TERMINAL_HEIGHT_MIN,
   fitAgentPanel
 } from '@/agent/chrome/fit'
-import { useAgentStore } from './agent'
+import { terminalDirectory } from '@/agent/terminalDirectory'
 import { usePreferencesStore } from './preferences'
 import { debouncedSendBufferedState } from './bufferedState'
 
@@ -194,10 +194,13 @@ export const useLayoutStore = defineStore('layout', () => {
     DISPATCH_LAYOUT_MENU_ITEMS()
   }
 
+  const terminalAvailable = computed(() =>
+    usePreferencesStore().agentModeEnabled && terminalDirectory().length > 0
+  )
+
   function TOGGLE_LAYOUT_ENTRY(entryName: LayoutToggle): void {
-    const agent = useAgentStore()
     if (entryName === 'showAgentPanel' && !usePreferencesStore().agentModeEnabled) return
-    if (entryName === 'showTerminalPanel' && !agent.agentAvailable) return
+    if (entryName === 'showTerminalPanel' && !terminalAvailable.value) return
 
     if (entryName === 'showSideBar') {
       showSideBar.value = !showSideBar.value
@@ -267,7 +270,7 @@ export const useLayoutStore = defineStore('layout', () => {
     window.addEventListener('resize', onResize)
 
     watch(
-      () => [useAgentStore().agentAvailable, usePreferencesStore().agentModeEnabled] as const,
+      () => [terminalAvailable.value, usePreferencesStore().agentModeEnabled] as const,
       () => {
         DISPATCH_LAYOUT_MENU_ITEMS()
       },
@@ -310,7 +313,7 @@ export const useLayoutStore = defineStore('layout', () => {
       showSideBar: showSideBar.value,
       showAgentPanel: showAgentPanel.value,
       showTerminalPanel: showTerminalPanel.value,
-      agentAvailable: useAgentStore().agentAvailable,
+      terminalAvailable: terminalAvailable.value,
       agentPanelEnabled: usePreferencesStore().agentModeEnabled
     })
   }
@@ -329,6 +332,7 @@ export const useLayoutStore = defineStore('layout', () => {
     agentPanelTab,
     agentPanelWidth,
     showTerminalPanel,
+    terminalAvailable,
     terminalPanelHeight,
     viewportHeight,
     effectiveAgentWidth,

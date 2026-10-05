@@ -106,7 +106,7 @@
           />
         </button>
         <button
-          v-if="agentAvailable"
+          v-if="terminalAvailable"
           type="button"
           class="tab-action"
           :aria-pressed="showTerminalPanel"
@@ -160,8 +160,8 @@ const { open: diffOpen, active: diffActive, scope: diffScope } = storeToRefs(dif
 const diffTitle = computed(() =>
   diffScope.value === 'worktree' ? t('diff.workingCopy') : t('diff.turn')
 )
-const { showAgentPanel, showTerminalPanel } = storeToRefs(layoutStore)
-const { agentAvailable, turnInProgress } = storeToRefs(useAgentStore())
+const { showAgentPanel, showTerminalPanel, terminalAvailable } = storeToRefs(layoutStore)
+const { turnInProgress } = storeToRefs(useAgentStore())
 const { agentModeEnabled } = storeToRefs(usePreferencesStore())
 const { unresolvedCount } = storeToRefs(useCommentsStore())
 

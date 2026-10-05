@@ -16,9 +16,9 @@ import {
   TEXT_COLUMN_MIN,
   fitAgentPanel
 } from '@/agent/chrome/fit'
-import { useAgentStore } from '@/store/agent'
 import { useLayoutStore } from '@/store/layout'
 import { usePreferencesStore } from '@/store/preferences'
+import { useProjectStore } from '@/store/project'
 
 const win = window as unknown as {
   electron?: { ipcRenderer: { on: Mock; send: Mock; invoke: Mock } }
@@ -133,9 +133,10 @@ describe('agent layout buffer', () => {
     expect(localStorage.getItem('terminal-panel-height')).toBe('180')
   })
 
-  it('toggles the agent panel while mode is on, and the terminal only in a repository', () => {
+  it('toggles the agent panel while mode is on, and the terminal in any opened directory', () => {
     const layout = useLayoutStore()
     const preferences = usePreferencesStore()
+    const project = useProjectStore()
     expect(layout.showAgentPanel).toBe(true)
 
     layout.TOGGLE_LAYOUT_ENTRY('showAgentPanel')
@@ -143,16 +144,29 @@ describe('agent layout buffer', () => {
     layout.TOGGLE_LAYOUT_ENTRY('showAgentPanel')
     expect(layout.showAgentPanel).toBe(true)
 
+    layout.TOGGLE_LAYOUT_ENTRY('showTerminalPanel')
+    expect(layout.showTerminalPanel).toBe(false)
+
+    project.projectTree = {
+      pathname: '/work',
+      name: 'work',
+      isDirectory: true,
+      isFile: false,
+      isMarkdown: false,
+      folders: [],
+      files: []
+    }
+
+    layout.TOGGLE_LAYOUT_ENTRY('showTerminalPanel')
+    expect(layout.showTerminalPanel).toBe(true)
+    layout.TOGGLE_LAYOUT_ENTRY('showTerminalPanel')
+    expect(layout.showTerminalPanel).toBe(false)
+
     preferences.agentModeEnabled = false
     layout.TOGGLE_LAYOUT_ENTRY('showAgentPanel')
     expect(layout.showAgentPanel).toBe(true)
     layout.TOGGLE_LAYOUT_ENTRY('showTerminalPanel')
     expect(layout.showTerminalPanel).toBe(false)
-
-    preferences.agentModeEnabled = true
-    useAgentStore().repoState = { kind: 'repo', root: '/repo', userName: 'Ada' }
-    layout.TOGGLE_LAYOUT_ENTRY('showTerminalPanel')
-    expect(layout.showTerminalPanel).toBe(true)
   })
 })
 

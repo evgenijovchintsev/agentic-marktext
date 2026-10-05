@@ -1,5 +1,25 @@
-import ced from 'ced'
+import { createRequire } from 'node:module'
+import log from 'electron-log'
 import type { Encoding } from 'common/encoding'
+
+type CedDetect = (buffer: Buffer) => string
+
+const require = createRequire(import.meta.url)
+let cedDetect: CedDetect | null | undefined
+
+// A Windows package built on Linux still contains the host `ced.node`.
+// Loading that ELF aborts the main process ("not a valid Win32 application"),
+// so a failed load falls back to UTF-8 instead of crashing.
+const loadCed = (): CedDetect | null => {
+  if (cedDetect !== undefined) return cedDetect
+  try {
+    cedDetect = require('ced') as CedDetect
+  } catch (error) {
+    cedDetect = null
+    log.error('ced encoding detector is unavailable:', error)
+  }
+  return cedDetect
+}
 
 const CED_ICONV_ENCODINGS: Record<string, string> = {
   'BIG5-CP950': 'big5',
@@ -70,7 +90,9 @@ export const guessEncoding = (buffer: Buffer, autoGuessEncoding: boolean): Encod
     if (isLikelyUtf8(buffer)) {
       return { encoding: 'utf8', isBom }
     }
-    encoding = ced(buffer)
+    const detect = loadCed()
+    if (!detect) return { encoding: 'utf8', isBom }
+    encoding = detect(buffer)
     if (CED_ICONV_ENCODINGS[encoding]) {
       encoding = CED_ICONV_ENCODINGS[encoding]
     } else {

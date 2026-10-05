@@ -224,7 +224,7 @@ declare global {
   }
 
   interface TermAPI {
-    create(size: { cols: number; rows: number }): Promise<{ termId: string; shell: string }>
+    create(size: { cols: number; rows: number; cwd?: string }): Promise<{ termId: string; shell: string }>
     kill(termId: string): Promise<void>
     input(termId: string, data: string): void
     resize(termId: string, cols: number, rows: number): void

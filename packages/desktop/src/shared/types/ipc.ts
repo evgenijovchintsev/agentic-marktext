@@ -135,7 +135,7 @@ export interface IpcInvokeChannels {
   'mt::spellchecker-remove-word': { args: [word: string]; ret: boolean }
   'mt::spellchecker-set-enabled': { args: [enabled: boolean]; ret: void }
   'mt::spellchecker-switch-language': { args: [language: string]; ret: void }
-  'mt::term::create': { args: [size: { cols: number; rows: number }]; ret: { termId: string; shell: string } }
+  'mt::term::create': { args: [size: { cols: number; rows: number; cwd?: string }]; ret: { termId: string; shell: string } }
   'mt::term::kill': { args: [termId: string]; ret: void }
   'mt::uploader::upload': { args: [req: unknown]; ret: unknown }
   'mt::win::is-fullscreen': { args: []; ret: boolean }

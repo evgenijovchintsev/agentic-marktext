@@ -31,7 +31,7 @@
           :platform="platform"
         />
       </div>
-      <terminal-panel v-if="agentAvailable" />
+      <terminal-panel v-if="terminalAvailable" />
       <command-palette />
       <about-dialog />
       <export-setting-dialog />
@@ -88,8 +88,7 @@ const notificationStore = useNotificationStore()
 const timer = ref<ReturnType<typeof setTimeout> | null>(null)
 
 const { windowActive, platform, init } = storeToRefs(mainStore)
-const { showTabBar, showAgentPanel } = storeToRefs(layoutStore)
-const { agentAvailable } = storeToRefs(agentStore)
+const { showTabBar, showAgentPanel, terminalAvailable } = storeToRefs(layoutStore)
 const { sourceCode, theme, customCss, textDirection, zoom, agentModeEnabled } = storeToRefs(preferencesStore)
 const { projectTree } = storeToRefs(projectStore)
 const { currentFile, selectionWordCount } = storeToRefs(editorStore)

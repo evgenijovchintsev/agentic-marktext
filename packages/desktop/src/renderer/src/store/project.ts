@@ -7,6 +7,7 @@ import { create, paste, rename, type FileCreateType, type PasteOptions } from '.
 import { PATH_SEPARATOR } from '../config'
 import notice from '../services/notification'
 import { getFileStateFromData } from './help'
+import { useAgentStore } from './agent'
 import { useLayoutStore } from './layout'
 import { useEditorStore } from './editor'
 import { debouncedSendBufferedState } from './bufferedState'
@@ -18,6 +19,20 @@ type TreeChange = FileChangeDetail
 
 const normalizeProjectRoot = (pathname: string | null | undefined): string => {
   return pathname ? window.path.normalize(pathname) : ''
+}
+
+const sameDirectory = (left: string, right: string): boolean => {
+  const strip = (value: string) => window.path.normalize(value).replace(/[\\/]+$/, '')
+  const a = strip(left)
+  const b = strip(right)
+  return window.electron?.process?.platform === 'win32'
+    ? a.toLowerCase() === b.toLowerCase()
+    : a === b
+}
+
+const isGitDirAtRoot = (root: string | undefined, change: TreeChange): boolean => {
+  if (!root || change.name !== '.git' || typeof change.pathname !== 'string') return false
+  return sameDirectory(window.path.dirname(change.pathname), root)
 }
 
 const createProjectRoot = (pathname: string): ProjectTree | null => {
@@ -178,6 +193,11 @@ export const useProjectStore = defineStore('project', () => {
         break
       case 'addDir':
         addDirectory(projectTree.value!, change)
+        // `git init` creates this directory. The shell does not tell the window,
+        // so the repository is resolved again and agent features can unlock.
+        if (isGitDirAtRoot(projectTree.value?.pathname, change)) {
+          useAgentStore().refreshRepoState()
+        }
         break
       case 'unlinkDir':
         unlinkDirectory(projectTree.value!, change)

@@ -78,6 +78,9 @@ asarUnpack:
   - out/main/agentMcpBridge.js
   # The pty addon is a native binary; Electron cannot load it from inside asar.
   - node_modules/node-pty/**/*
+  # rg.exe is spawned as a process. A Windows build made on Linux only has this
+  # binary when it is a direct dependency, and it must sit outside the asar.
+  - node_modules/@vscode/ripgrep-win32-x64/**/*
 fileAssociations:
   - ext: md
     name: Markdown

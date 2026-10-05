@@ -21,7 +21,8 @@ import { GitDiffError, getUserName, worktreeDiff } from './repo/gitService'
 import { repoRegistry } from './repo/repoRegistry'
 import { resolveFolderRepo } from './repo/resolveFolderRepo'
 import { recordEditorSave } from './turn/changeTracker'
-import { PtyManager } from './terminal/ptyManager'
+import { PtyManager, PtyManagerError } from './terminal/ptyManager'
+import { resolveTerminalCwd } from './terminal/terminalCwd'
 import { clearTerminalFocus, setTerminalFocused } from './terminal/terminalFocus'
 import { TurnRunner, TurnRunnerError } from './turn/turnRunner'
 import type { ThreadPlacement } from './turn/messageBuilder'
@@ -128,7 +129,6 @@ export const registerAgentIpc = (deps?: AgentIpcDeps): void => {
   hookEditorSaves()
   terms = new PtyManager({
     shellPreference: () => deps?.harnessPath('agentTerminalShell'),
-    repoRoot: repoOf,
     newId: () => randomUUID(),
     onData: (windowId, termId, data) => {
       const win = BrowserWindow.fromId(windowId)
@@ -274,12 +274,14 @@ export const registerAgentIpc = (deps?: AgentIpcDeps): void => {
     return worktreeDiff(root, request?.paths)
   })
 
-  ipcMain.handle('mt::term::create', (event, size: { cols?: number, rows?: number } | undefined) => {
+  ipcMain.handle('mt::term::create', (event, size: { cols?: number, rows?: number, cwd?: string } | undefined) => {
     requireAgentMode(deps)
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return Promise.reject(new Error('no window'))
+    const cwd = resolveTerminalCwd(deps?.directoryForWindow?.(win.id) ?? null, size?.cwd)
+    if (!cwd) return Promise.reject(new PtyManagerError())
     turnRunnerFor(win.id, deps)
-    return terms?.create(win.id, { cols: size?.cols ?? 80, rows: size?.rows ?? 24 })
+    return terms?.create(win.id, { cols: size?.cols ?? 80, rows: size?.rows ?? 24, cwd })
   })
 
   ipcMain.handle('mt::term::kill', (event, termId: string) => {

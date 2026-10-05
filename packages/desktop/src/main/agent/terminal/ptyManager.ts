@@ -6,9 +6,9 @@ export const PTY_FLUSH_MS = 16
 const STOP_TIMEOUT_MS = 2_000
 
 export class PtyManagerError extends Error {
-  readonly code = 'no_repo' as const
+  readonly code = 'no_directory' as const
 
-  constructor(message = 'the window has no repository') {
+  constructor(message = 'the window has no directory') {
     super(message)
     this.name = 'PtyManagerError'
   }
@@ -17,7 +17,6 @@ export class PtyManagerError extends Error {
 export interface PtyManagerDeps {
   /** `agentTerminalShell`. Empty means the platform default. */
   shellPreference(): unknown
-  repoRoot(windowId: number): string | null
   newId(): string
   onData(windowId: number, termId: string, data: string): void
   onExit(windowId: number, termId: string, code: number | null): void
@@ -64,8 +63,8 @@ const terminalEnv = (): Record<string, string> => {
 }
 
 /**
- * One window may own several ptys. They all share the repository root as cwd
- * and die together when the window closes or the folder changes.
+ * One window may own several ptys. Each new shell starts in the directory
+ * passed to `create` and dies with the window.
  */
 export class PtyManager {
   private readonly sessions = new Map<string, Session>()
@@ -73,9 +72,9 @@ export class PtyManager {
 
   constructor(private readonly deps: PtyManagerDeps) {}
 
-  create(windowId: number, size: { cols: number, rows: number }): { termId: string, shell: string } {
-    const root = this.deps.repoRoot(windowId)
-    if (!root) throw new PtyManagerError()
+  create(windowId: number, size: { cols: number, rows: number, cwd: string }): { termId: string, shell: string } {
+    const cwd = size.cwd.trim()
+    if (!cwd) throw new PtyManagerError()
     const configured = this.deps.shellPreference()
     const shell = typeof configured === 'string' && configured.trim().length > 0
       ? configured.trim()
@@ -87,7 +86,7 @@ export class PtyManager {
       name: 'xterm-256color',
       cols,
       rows,
-      cwd: root,
+      cwd,
       env: terminalEnv()
     })
     let settle = (): void => undefined

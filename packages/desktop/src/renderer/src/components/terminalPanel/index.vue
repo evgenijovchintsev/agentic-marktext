@@ -121,6 +121,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { clampTerminalHeight, TERMINAL_COLLAPSE_BELOW } from '@/agent/chrome/fit'
+import { terminalDirectory } from '@/agent/terminalDirectory'
 import { terminalColors } from '@/agent/terminalTheme'
 import { useAgentStore } from '@/store/agent'
 import { useLayoutStore } from '@/store/layout'
@@ -153,7 +154,7 @@ const { repoState } = storeToRefs(useAgentStore())
 const renderedHeight = computed(() =>
   clampTerminalHeight(terminalPanelHeight.value, viewportHeight.value || 768)
 )
-const cwd = computed(() => repoState.value.kind === 'repo' ? repoState.value.root : '')
+const cwd = computed(() => terminalDirectory())
 
 const panelRoot = ref<HTMLElement | null>(null)
 const tabs = ref<TermTab[]>([])
@@ -221,9 +222,12 @@ const openPty = async (tab: TermTab): Promise<void> => {
     window.term.input(tab.termId, data)
   })
   try {
+    const directory = cwd.value
+    if (!directory) throw new Error('terminal has no directory')
     const created = await window.term.create({
       cols: Math.max(1, term.cols),
-      rows: Math.max(1, term.rows)
+      rows: Math.max(1, term.rows),
+      cwd: directory
     })
     tab.termId = created.termId
     tab.name = `${created.shell} ${tab.slot}`
@@ -351,6 +355,29 @@ const onFocusOut = (event: FocusEvent): void => {
   window.term.setFocused(false)
 }
 
+// `git init` in the shell does not notify the window. While the panel is
+// open in a directory that is not a repository yet, ask again so agent
+// features unlock without reopening the folder.
+const REPO_PROBE_MS = 1000
+let repoProbe: ReturnType<typeof setInterval> | null = null
+const stopRepoProbe = (): void => {
+  if (repoProbe == null) return
+  clearInterval(repoProbe)
+  repoProbe = null
+}
+watch(
+  () => showTerminalPanel.value && repoState.value.kind !== 'repo',
+  (pending) => {
+    stopRepoProbe()
+    if (!pending) return
+    const agent = useAgentStore()
+    repoProbe = setInterval(() => {
+      agent.refreshRepoState()
+    }, REPO_PROBE_MS)
+  },
+  { immediate: true }
+)
+
 watch(showTerminalPanel, (open) => {
   if (!open) {
     window.term?.setFocused(false)
@@ -385,6 +412,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopRepoProbe()
   offData?.()
   offExit?.()
   window.term?.setFocused(false)

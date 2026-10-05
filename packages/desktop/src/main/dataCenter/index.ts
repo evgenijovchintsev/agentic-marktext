@@ -1,7 +1,7 @@
+import { createRequire } from 'node:module'
 import fs from 'fs'
 import path from 'path'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import keytar from 'keytar'
 import schema from './schema.json'
 import Store, { type Schema } from 'electron-store'
 import log from 'electron-log'
@@ -10,6 +10,27 @@ import { IMAGE_EXTENSIONS } from 'common/filesystem/paths'
 import { TypedEmitter } from '@shared/types/typedEmitter'
 
 const DATA_CENTER_NAME = 'dataCenter'
+const require = createRequire(import.meta.url)
+
+type Keytar = {
+  getPassword: (service: string, account: string) => Promise<string | null>
+  setPassword: (service: string, account: string, password: string) => Promise<void>
+}
+
+let keytarModule: Keytar | null | undefined
+
+// Same cross-build failure as `ced`: the packaged addon may not be a Win32
+// image. Credentials then stay in the store file instead of taking down startup.
+const loadKeytar = (): Keytar | null => {
+  if (keytarModule !== undefined) return keytarModule
+  try {
+    keytarModule = require('keytar') as Keytar
+  } catch (error) {
+    keytarModule = null
+    log.error('Keytar is unavailable:', error)
+  }
+  return keytarModule
+}
 
 // No events emitted directly on `this`. ipcMain.emit is used for cross-
 // process broadcasts but those don't fire through this instance.
@@ -75,6 +96,8 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
     try {
       const encryptData = await Promise.all(
         encryptKeys.map((key) => {
+          const keytar = loadKeytar()
+          if (!keytar) return Promise.resolve(null)
           return keytar.getPassword(serviceName, key)
         })
       )
@@ -121,6 +144,8 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
   getItem(key: string): Promise<unknown> {
     const { encryptKeys, serviceName } = this
     if (encryptKeys.includes(key)) {
+      const keytar = loadKeytar()
+      if (!keytar) return Promise.resolve(this.store.get(key))
       return keytar.getPassword(serviceName, key)
     } else {
       const value = this.store.get(key)
@@ -136,6 +161,8 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
     ipcMain.emit('broadcast-user-data-changed', { [key]: value })
     if (encryptKeys.includes(key)) {
       try {
+        const keytar = loadKeytar()
+        if (!keytar) return
         return await keytar.setPassword(serviceName, key, value as string)
       } catch (err) {
         log.error('Keytar error:', err)

@@ -140,7 +140,7 @@ export const viewLayoutChanged = (
       case 'showTerminalPanel':
         changeMenuByName('terminalPanelMenuItem', value)
         break
-      case 'agentAvailable':
+      case 'terminalAvailable':
         disableMenuByName('terminalPanelMenuItem', !!value)
         break
       case 'agentPanelEnabled':
